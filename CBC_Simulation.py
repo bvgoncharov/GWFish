@@ -110,7 +110,7 @@ Use "all" to get all possible combinations of the detectors given.''')
 
             if calculate_errors:
                 network.detectors[d].fisher_matrix[k, :, :] = \
-                    gw.fishermatrix.FisherMatrix(waveform_model, parameter_values, fisher_parameters, network.detectors[d], waveform_class=waveform_class).fm
+                    gw.fishermatrix.FisherMatrix(waveform_obj, parameter_values, fisher_parameters, network.detectors[d]).fm
 
         network.SNR[k] = np.sqrt(networkSNR_sq)
 

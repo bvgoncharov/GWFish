@@ -5,6 +5,7 @@ import GWFish.modules.auxiliary as aux
 import GWFish.modules.fft as fft
 
 import copy
+import pickle
 
 def invertSVD(matrix):
     thresh = 1e-10
@@ -45,13 +46,10 @@ class Derivative:
 
     eps: 1e-5, this follows the simple "cube root of numerical precision" recommendation, which is 1e-16 for double
     """
-    def __init__(self, waveform, parameters, detector, eps=1e-5, waveform_class=wf.Waveform):
-        self.waveform = waveform
+    def __init__(self, waveform_object, parameters, detector, eps=1e-5):
+        self.waveform_object = waveform_object
         self.detector = detector
         self.eps = eps
-        self.waveform_class = waveform_class
-        self.data_params = {'frequencyvector': detector.frequencyvector}
-        self.waveform_object = waveform_class(waveform, parameters, self.data_params)
         self.waveform_at_parameters = None
         self.projection_at_parameters = None
 
@@ -82,6 +80,11 @@ class Derivative:
     @property
     def projection_at_parameters(self):
         if self._projection_at_parameters is None:
+            # Neglecting a projection
+            #self._projection_at_parameters = self.waveform_at_parameters[0][:,0] + 1j * self.waveform_at_parameters[0][:,1]
+            #self._projection_at_parameters = self._projection_at_parameters[:,np.newaxis]
+            #self._projection_at_parameters = np.repeat(self._projection_at_parameters, 3, axis=1)
+            # Not neglecting a projection
             self._projection_at_parameters = det.projection(self.local_params, self.detector,
                                                             self.waveform_at_parameters[0], # wave
                                                             self.waveform_at_parameters[1]) # t(f)
@@ -150,10 +153,10 @@ class Derivative:
         return self.with_respect_to(target_parameter)
 
 class FisherMatrix:
-    def __init__(self, waveform, parameters, fisher_parameters, detector, eps=1e-5, waveform_class=wf.Waveform):
+    def __init__(self, waveform_object, parameters, fisher_parameters, detector, eps=1e-5):
         self.fisher_parameters = fisher_parameters
         self.detector = detector
-        self.derivative = Derivative(waveform, parameters, detector, eps=eps, waveform_class=waveform_class)
+        self.derivative = Derivative(waveform_object, parameters, detector, eps=eps)
         self.nd = len(fisher_parameters)
         self.fm = None
 
@@ -181,6 +184,14 @@ class FisherMatrix:
 
     def __call__(self):
         return self.fm
+
+    def pickle(self, file_name):
+        if 'LAL' in str(type(self.derivative.waveform_object)):
+            # These attributes can not be pickled
+            self.derivative.waveform_object._lalsim_args = None
+            self.derivative.waveform_object._params_lal = None
+        with open(file_name, 'wb') as fh:
+            pickle.dump(self, fh)
 
 def analyzeFisherErrors(network, parameter_values, fisher_parameters, population, networks_ids):
     """

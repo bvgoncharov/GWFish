@@ -112,6 +112,9 @@ class Waveform:
         self.data_params = data_params
         self._frequency_domain_strain = None
         self._time_domain_strain = None
+        self.gw_params_cache = ()
+        self.frequency_domain_strain_cache = ()
+        self.time_domain_strain_cache = ()
         self._f_ref = None
 
         if 'frequencyvector' in data_params:
@@ -164,6 +167,25 @@ class Waveform:
         }
 
     def update_gw_params(self, new_gw_params):
+        self._update_gw_params_common(new_gw_params)
+
+    def _update_gw_params_common(self, new_gw_params):
+        """ Common procedure for child classes, to be shared """
+        if new_gw_params.to_dict() in self.gw_params_cache:
+            self._update_gw_params_from_cache(new_gw_params)
+        else:
+            self._update_gw_params_and_cache(new_gw_params)
+
+    def _update_gw_params_from_cache(self, new_gw_params):
+        idx = self.gw_params_cache.index(new_gw_params)
+        self.gw_params.update(new_gw_params)
+        self._frequency_domain_strain = self.frequency_domain_strain_cache[idx]
+        self._time_domain_strain = self.time_domain_strain_cache[idx]
+
+    def _update_gw_params_and_cache(self, new_gw_params):
+        self.gw_params_cache += (self.gw_params,)
+        self.frequency_domain_strain_cache += (self._frequency_domain_strain,)
+        self.time_domain_strain_cache += (self._time_domain_strain,)
         self.gw_params.update(new_gw_params)
         self._frequency_domain_strain = None
         self._time_domain_strain = None
@@ -240,9 +262,7 @@ class LALFD_Waveform(Waveform):
                 'phi_12', 'a_1', 'a_2', 'mass_1', 'mass_2', 'phase']
 
     def update_gw_params(self, new_gw_params):
-        self.gw_params.update(new_gw_params)
-        self._frequency_domain_strain = None
-        self._time_domain_strain = None
+        self._update_gw_params_common(new_gw_params)
         # Specific to LALFD_Waveform
         self._init_lambda()
         self._init_lal_gw_parameters()
@@ -293,7 +313,7 @@ class LALFD_Waveform(Waveform):
                 self.gw_params['spin_2x'], self.gw_params['spin_2y'], self.gw_params['spin_2z'],
                 self.gw_params['luminosity_distance'] * lal.PC_SI * 1e6,  # in [m]
                 self.gw_params['iota'],
-                0, # phiRef, the phase at f_ref or peak amplitude (depends on waveform)
+                self.gw_params['phase'], # phiRef, the phase at f_ref or peak amplitude (depends on waveform)
                 0, # longAscNodes, longitude of ascending nodes
                 0, # eccentricity
                 0, # meanPerAno, mean anomaly at reference epoch
@@ -323,12 +343,12 @@ class LALFD_Waveform(Waveform):
     def _lal_fd_phase_correction_by_epoch_and_df(self):
         """ This correction is also done in Bilby after calling SimInspiralFD """
         # BORIS: weird Bilby correction
-        dt = 1. / self.delta_f + (self._lal_hf_plus.epoch.gpsSeconds +
+        #import ipdb; ipdb.set_trace()
+        dt = 1/self.delta_f + (self._lal_hf_plus.epoch.gpsSeconds +
                                   self._lal_hf_plus.epoch.gpsNanoSeconds * 1e-9)
-        self.hf_plus_out *= np.exp(
-            -1j * 2 * np.pi * dt * self.frequencyvector)
-        self.hf_cross_out *= np.exp(
-            -1j * 2 * np.pi * dt * self.frequencyvector)
+        #dt = -127.842604494 #+ 0.0009765625 # 0.0009861932938856016 # 1/(512*2 - 10)
+        self.hf_plus_out *= np.exp(-1j * 2 * np.pi * dt * self.frequencyvector)
+        self.hf_cross_out *= np.exp(-1j * 2 * np.pi * dt * self.frequencyvector)
 
     def _hf_postproccessing_SimInspiralFD(self):
         self._lal_fd_strain_adjust_frequency_range()
@@ -386,7 +406,7 @@ class LALTD_Waveform(LALFD_Waveform):
                 self.gw_params['spin_2x'], self.gw_params['spin_2y'], self.gw_params['spin_2z'],
                 self.gw_params['luminosity_distance'] * lal.PC_SI * 1e6,  # in [m]
                 self.gw_params['iota'],
-                0, # phiRef, the phase at f_ref or peak amplitude (depends on waveform)
+                self.gw_params['phase'], # phiRef, the phase at f_ref or peak amplitude (depends on waveform)
                 0, # longAscNodes, longitude of ascending nodes
                 0, # eccentricity
                 0, # meanPerAno, mean anomaly at reference epoch
@@ -396,26 +416,23 @@ class LALTD_Waveform(LALFD_Waveform):
                 self._params_lal,
                 self._approx_lal
             ]
-            logging.warning("Parameters phiRef, longAscNodes, eccentricity, meanPerAno"
-                            "are set to zero.")
         else:
             raise ValueError('Waveform approximant is not implemented in time-domain in LALSimulation.')
 
-    @property
-    def lal_time_ht_plus(self):
+    def time_array_for_lal_timeseries(self, lal_ht):
         """Zero time at the merger """
-        t0 = self._lal_ht_plus.epoch.gpsSeconds + 1e-9*self._lal_ht_plus.epoch.gpsNanoSeconds
-        dt = self._lal_ht_plus.deltaT
-        nn = self._lal_ht_plus.data.length
+        t0 = lal_ht.epoch.gpsSeconds + 1e-9*lal_ht.epoch.gpsNanoSeconds
+        dt = lal_ht.deltaT
+        nn = lal_ht.data.length
         return np.arange(t0, t0+nn*dt, dt)
 
     @property
+    def lal_time_ht_plus(self):
+        return self.time_array_for_lal_timeseries(self._lal_ht_plus)
+
+    @property
     def lal_time_ht_cross(self):
-        """Zero time at the merger """
-        t0 = self._lal_ht_cross.epoch.gpsSeconds + 1e-9*self._lal_ht_cross.epoch.gpsNanoSeconds
-        dt = self._lal_ht_cross.deltaT
-        nn = self._lal_ht_cross.data.length
-        return np.arange(t0, t0+nn*dt, dt)
+        return self.time_array_for_lal_timeseries(self._lal_ht_cross)
 
     def calculate_time_domain_strain(self):
         # Note, waveform below is already conditioned (tapered)
@@ -427,8 +444,6 @@ class LALTD_Waveform(LALFD_Waveform):
         htc = self.ht_cross_out[:, np.newaxis]
 
         polarizations = np.hstack((htp, htc))
-
-        print('Warning: inverting hx in LAL caller')
     
         self._time_domain_strain = polarizations
 
@@ -438,7 +453,7 @@ class LALTD_Waveform(LALFD_Waveform):
             # Step 0 (even before SimInspiralTD). Set up a Nyqist frequency to be equal to maximum frequency
             # https://git.ligo.org/lscsoft/lalsuite/-/blob/master/lalsimulation/lib/LALSimInspiral.c#L2895
             f_nyquist = self.f_nyquist
-            if int(np.log2(self.f_max/self.delta_f)) == np.log2(self.f_max/self.delta_f):
+            if int(np.log2(self.f_max/self.delta_f)) != np.log2(self.f_max/self.delta_f):
                 logging.warning('f_max/deltaF is not a power of two: changing f_max.')
                 f_nyquist = 2**(np.floor(np.log2(f_nyquist/self.delta_f))-np.log2(1/self.delta_f))
                 if self.f_max != f_nyquist:
@@ -454,7 +469,7 @@ class LALTD_Waveform(LALFD_Waveform):
             else:
                 chirplen = 2 * f_nyquist / self.delta_f
                 if chirplen < self._lal_ht_plus.data.length: # This number should be h_plus.data.length
-                    logging.warning('Specified frequency interval of %g Hz is too large for a chirp'+\
+                    logging.warning('Specified frequency interval of %g Hz is too large for a chirp '+\
                                     'of duration %g s with Nyquist frequency %g Hz.'+\
                                     'The inspiral will be truncated.')
 

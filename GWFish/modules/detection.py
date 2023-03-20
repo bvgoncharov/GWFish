@@ -345,7 +345,7 @@ def projection_solarorbit(parameters, detector, polarizations, timevector):
 
     return proj
 
-def projection_earth(parameters, detector, polarizations, timevector):
+def projection_earth(parameters, detector, polarizations, timevector, earth_rotation=True):
     """
     See Nishizawa et al. (2009) arXiv:0903.0528 for definitions of the polarisation tensors.
     [u, v, w] represent the Earth-frame
@@ -354,7 +354,8 @@ def projection_earth(parameters, detector, polarizations, timevector):
     Note2: it is computationally more expensive to use numpy.einsum instead of working with several vector quantities
     """
 
-    # timevector = parameters['geocent_time'] * np.ones_like(timevector)  # switch off Earth's rotation
+    if not earth_rotation:
+        timevector = parameters['geocent_time'] * np.ones_like(timevector)  # switch off Earth's rotation
 
     nf = len(polarizations[:, 0])
     ff = detector.frequencyvector
