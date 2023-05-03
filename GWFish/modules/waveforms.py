@@ -183,7 +183,7 @@ class Waveform:
         self._time_domain_strain = self.time_domain_strain_cache[idx]
 
     def _update_gw_params_and_cache(self, new_gw_params):
-        self.gw_params_cache += (self.gw_params,)
+        self.gw_params_cache += (self.new_gw_params,)
         self.frequency_domain_strain_cache += (self._frequency_domain_strain,)
         self.time_domain_strain_cache += (self._time_domain_strain,)
         self.gw_params.update(new_gw_params)

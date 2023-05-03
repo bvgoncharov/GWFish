@@ -85,11 +85,9 @@ def scalar_product(deriv1, deriv2, detector):
     if ff.ndim == 1:
         ff = ff[:, np.newaxis]
 
-    df = ff[1, 0] - ff[0, 0]
-
     scalar_prods = np.zeros(len(components))
     for k in np.arange(len(components)):
         scalar_prods[k] = 4 * np.trapz(
-                np.real(deriv1[:, k] * np.conjugate(deriv2[:, k])) / components[k].Sn(ff[:, 0]), ff[:, 0], axis=0)
+                np.real(deriv1[detector.frequency_mask, k] * np.conjugate(deriv2[detector.frequency_mask, k])) / components[k].Sn(ff[detector.frequency_mask, 0]), ff[detector.frequency_mask, 0], axis=0)
 
     return scalar_prods
