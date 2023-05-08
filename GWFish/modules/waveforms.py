@@ -177,18 +177,22 @@ class Waveform:
             self._update_gw_params_and_cache(new_gw_params)
 
     def _update_gw_params_from_cache(self, new_gw_params):
-        idx = self.gw_params_cache.index(new_gw_params)
+        idx = self.gw_params_cache.index(new_gw_params.to_dict())
         self.gw_params.update(new_gw_params)
         self._frequency_domain_strain = self.frequency_domain_strain_cache[idx]
         self._time_domain_strain = self.time_domain_strain_cache[idx]
 
     def _update_gw_params_and_cache(self, new_gw_params):
-        self.gw_params_cache += (self.new_gw_params,)
-        self.frequency_domain_strain_cache += (self._frequency_domain_strain,)
-        self.time_domain_strain_cache += (self._time_domain_strain,)
         self.gw_params.update(new_gw_params)
         self._frequency_domain_strain = None
         self._time_domain_strain = None
+        self.frequency_domain_strain
+        self.gw_params_cache += (new_gw_params.to_dict(),)
+        self.frequency_domain_strain_cache += (self._frequency_domain_strain,)
+        self.time_domain_strain_cache += (self._time_domain_strain,)
+        #self.gw_params.update(new_gw_params)
+        #self._frequency_domain_strain = None
+        ##self._time_domain_strain = None
 
     @property
     def frequencyvector(self):

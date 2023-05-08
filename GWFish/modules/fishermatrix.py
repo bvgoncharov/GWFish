@@ -147,6 +147,9 @@ class Derivative:
                 derivative = np.exp(2j * np.pi * self.detector.frequencyvector \
                                     * self.tc) * (signal2 - signal1) / dp
 
+        # Returning to original parameters
+        self.waveform_object.update_gw_params(self.local_params)
+
         return derivative
 
     def __call__(self, target_parameter):
